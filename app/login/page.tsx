@@ -1,25 +1,15 @@
 'use client'
 
 import Image from 'next/image'
-import React, { Suspense, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-// Evita que Vercel intente prerenderizar /login (y dispare errores en build)
-export const dynamic = 'force-dynamic'
-
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen grid place-items-center text-sm text-gray-600">Cargando…</div>}>
-      <LoginInner />
-    </Suspense>
-  )
-}
-
-function LoginInner() {
   const router = useRouter()
-  const sp = useSearchParams()
-  const nextUrl = sp.get('next') || '/plan-mensual'
+
+  // NO usar useSearchParams() (causa error en build)
+  const [nextUrl, setNextUrl] = useState('/plan-mensual')
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
@@ -38,6 +28,19 @@ function LoginInner() {
     return `${u}${DOMAIN}`
   }, [user])
 
+  // Lee ?next=/ruta solo en cliente
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      const n = sp.get('next')
+      // seguridad: solo rutas internas
+      if (n && n.startsWith('/')) setNextUrl(n)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  // Si ya hay sesión, redirige
   useEffect(() => {
     let mounted = true
 
@@ -109,6 +112,8 @@ function LoginInner() {
       {/* Fondo */}
       <div className="absolute inset-0 bg-gray-100">
         <Image src="/bg-login.jpg" alt="Fondo" fill priority className="object-cover" />
+
+        {/* Overlay con colores del plan */}
         <div className="absolute inset-0 bg-green-900/55" />
         <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-gray-100/60 to-gray-200/80" />
       </div>
@@ -126,8 +131,8 @@ function LoginInner() {
       </div>
 
       {/* Card */}
-      <div className="relative z-10 min-h-[calc(100vh-120px)] flex items-center justify-center px-4">
-        <div className="w-full max-w-[420px] bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-black/10">
+      <div className="relative z-10 min-h-[calc(100vh-120px)] flex items-center justify-center px-4 sm:px-6">
+        <div className="w-full max-w-[360px] sm:max-w-[400px] md:max-w-[440px] bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-black/10">
           <div className="p-8">
             <div className="flex justify-center mb-8">
               <Image
@@ -136,7 +141,7 @@ function LoginInner() {
                 width={300}
                 height={180}
                 priority
-                className="w-[180px] h-auto mx-auto drop-shadow-sm"
+                className="w-[150px] sm:w-[170px] md:w-[190px] h-auto mx-auto drop-shadow-sm"
               />
             </div>
 
@@ -144,6 +149,7 @@ function LoginInner() {
               {/* Usuario */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Usuario</label>
+
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
@@ -152,10 +158,11 @@ function LoginInner() {
                     onChange={(e) => setUser(e.target.value)}
                     autoComplete="username"
                   />
-                  <div className="px-3 py-2 text-sm text-gray-600 border-l bg-gray-100 whitespace-nowrap">
+                  <div className="px-3 py-2 text-sm text-gray-600 border-l border-gray-300 bg-gray-100 whitespace-nowrap">
                     {DOMAIN}
                   </div>
                 </div>
+
                 <div className="text-xs text-gray-500 mt-1">
                   Ingrese solo su usuario (ej: <b>jguevara</b>)
                 </div>
@@ -164,6 +171,7 @@ function LoginInner() {
               {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Contraseña</label>
+
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
@@ -183,19 +191,21 @@ function LoginInner() {
                 </div>
               </div>
 
-              {/* Olvidó */}
-              <button
-                type="button"
-                onClick={onForgot}
-                disabled={loading}
-                className="text-sm text-green-700 hover:text-green-800 hover:underline disabled:opacity-60"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
+              {/* Olvidó contraseña */}
+              <div className="text-left">
+                <button
+                  type="button"
+                  onClick={onForgot}
+                  disabled={loading}
+                  className="text-sm text-green-700 hover:text-green-800 hover:underline disabled:opacity-60"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
 
-              {/* Mensaje */}
+              {/* Mensajes */}
               {msg && (
-                <div className="text-sm rounded-lg px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900">
+                <div className="text-sm rounded-lg px-3 py-2 border bg-yellow-50 border-yellow-200 text-yellow-900">
                   {msg}
                 </div>
               )}
@@ -208,6 +218,11 @@ function LoginInner() {
               >
                 {loading ? 'Ingresando…' : 'INGRESAR'}
               </button>
+
+              {/* Aviso */}
+              <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-900">
+                Esta plataforma está en fase de construcción. Algunas funciones pueden no estar disponibles.
+              </div>
 
               <div className="mt-3 text-center text-xs text-gray-500">Versión: {version}</div>
             </form>
