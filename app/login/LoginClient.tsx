@@ -8,17 +8,10 @@ import { supabase } from '@/lib/supabaseClient'
 export default function LoginClient() {
   const router = useRouter()
   const sp = useSearchParams()
+  const nextUrl = sp.get('next') || '/plan-mensual'
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
-
-  // Ruta a la que debe ir luego del login (?next=/plan-mensual)
-  const nextUrl = useMemo(() => {
-    const n = sp.get('next') || '/plan-mensual'
-    // Seguridad: solo permitir rutas internas
-    if (n.startsWith('/')) return n
-    return '/plan-mensual'
-  }, [sp])
 
   const [user, setUser] = useState('')
   const [password, setPassword] = useState('')
@@ -34,7 +27,6 @@ export default function LoginClient() {
     return `${u}${DOMAIN}`
   }, [user])
 
-  // Si ya hay sesión, redirige
   useEffect(() => {
     let mounted = true
 
@@ -118,7 +110,7 @@ export default function LoginClient() {
           width={210}
           height={64}
           className="h-12 w-auto"
-          style={{ objectFit: 'contain', mixBlendMode: 'multiply' }}
+          style={{ objectFit: 'contain' }}
         />
       </div>
 
@@ -138,7 +130,6 @@ export default function LoginClient() {
             </div>
 
             <form onSubmit={onLogin} className="space-y-4">
-              {/* Usuario */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Usuario</label>
 
@@ -160,7 +151,6 @@ export default function LoginClient() {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Contraseña</label>
 
@@ -183,7 +173,6 @@ export default function LoginClient() {
                 </div>
               </div>
 
-              {/* Olvidó contraseña */}
               <div className="text-left">
                 <button
                   type="button"
@@ -195,14 +184,12 @@ export default function LoginClient() {
                 </button>
               </div>
 
-              {/* Mensajes */}
               {msg && (
                 <div className="text-sm rounded-lg px-3 py-2 border bg-yellow-50 border-yellow-200 text-yellow-900">
                   {msg}
                 </div>
               )}
 
-              {/* Botón */}
               <button
                 type="submit"
                 disabled={loading}
@@ -211,7 +198,6 @@ export default function LoginClient() {
                 {loading ? 'Ingresando…' : 'INGRESAR'}
               </button>
 
-              {/* Aviso */}
               <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-900">
                 Esta plataforma está en fase de construcción. Algunas funciones pueden no estar disponibles.
               </div>
