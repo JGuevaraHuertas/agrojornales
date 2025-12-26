@@ -1,19 +1,25 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-// Evita que Vercel intente prerenderizar /login (y dispare el error de useSearchParams/Suspense en build)
+// Evita que Vercel intente prerenderizar /login (y dispare errores en build)
 export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
-  const router = useRouter()
+  return (
+    <Suspense fallback={<div className="min-h-screen grid place-items-center text-sm text-gray-600">Cargando…</div>}>
+      <LoginInner />
+    </Suspense>
+  )
+}
 
-  // Por defecto, después del login enviamos a Plan Mensual
-  // Usamos ref para evitar warnings de setState y no necesitamos re-render para esto.
-  const nextUrlRef = useRef('/plan-mensual')
+function LoginInner() {
+  const router = useRouter()
+  const sp = useSearchParams()
+  const nextUrl = sp.get('next') || '/plan-mensual'
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
@@ -32,47 +38,27 @@ export default function LoginPage() {
     return `${u}${DOMAIN}`
   }, [user])
 
-  /* =========================
-     LEE ?next=... EN CLIENTE
-     (Evita useSearchParams => evita error en Vercel build)
-  ========================= */
-  useEffect(() => {
-    try {
-      const sp = new URLSearchParams(window.location.search)
-      const n = sp.get('next')
-      if (n && n.startsWith('/')) nextUrlRef.current = n
-    } catch {
-      // ignore
-    }
-  }, [])
-
-  /* =========================
-     SESIÓN ACTIVA
-  ========================= */
   useEffect(() => {
     let mounted = true
 
     const run = async () => {
       const { data } = await supabase.auth.getSession()
       if (!mounted) return
-      if (data.session) router.replace(nextUrlRef.current)
+      if (data.session) router.replace(nextUrl)
     }
 
     run()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (session) router.replace(nextUrlRef.current)
+      if (session) router.replace(nextUrl)
     })
 
     return () => {
       mounted = false
       sub.subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, nextUrl])
 
-  /* =========================
-     LOGIN
-  ========================= */
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setMsg('')
@@ -94,12 +80,9 @@ export default function LoginPage() {
       return
     }
 
-    router.replace(nextUrlRef.current)
+    router.replace(nextUrl)
   }
 
-  /* =========================
-     OLVIDÓ CONTRASEÑA
-  ========================= */
   const onForgot = async () => {
     setMsg('')
     if (!user.trim()) {
@@ -223,7 +206,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full rounded-lg py-2.5 font-semibold text-white border border-green-700 bg-green-700 hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? 'Ingresando...' : 'INGRESAR'}
+                {loading ? 'Ingresando…' : 'INGRESAR'}
               </button>
 
               <div className="mt-3 text-center text-xs text-gray-500">Versión: {version}</div>
