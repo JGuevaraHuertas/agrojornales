@@ -1,11 +1,25 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+/* =========================
+   WRAPPER CON SUSPENSE
+========================= */
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+/* =========================
+   CONTENIDO REAL DEL LOGIN
+========================= */
+function LoginContent() {
   const router = useRouter()
   const sp = useSearchParams()
   const nextUrl = sp.get('next') || '/plan-mensual'
@@ -27,6 +41,9 @@ export default function LoginPage() {
     return `${u}${DOMAIN}`
   }, [user])
 
+  /* =========================
+     SESIÓN ACTIVA
+  ========================= */
   useEffect(() => {
     let mounted = true
 
@@ -48,6 +65,9 @@ export default function LoginPage() {
     }
   }, [router, nextUrl])
 
+  /* =========================
+     LOGIN
+  ========================= */
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setMsg('')
@@ -72,6 +92,9 @@ export default function LoginPage() {
     router.replace(nextUrl)
   }
 
+  /* =========================
+     OLVIDÓ CONTRASEÑA
+  ========================= */
   const onForgot = async () => {
     setMsg('')
     if (!user.trim()) {
@@ -93,13 +116,14 @@ export default function LoginPage() {
     setMsg('Te enviamos un correo para restablecer tu contraseña.')
   }
 
+  /* =========================
+     UI
+  ========================= */
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Fondo */}
       <div className="absolute inset-0 bg-gray-100">
         <Image src="/bg-login.jpg" alt="Fondo" fill priority className="object-cover" />
-
-        {/* Overlay con colores del plan */}
         <div className="absolute inset-0 bg-green-900/55" />
         <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-gray-100/60 to-gray-200/80" />
       </div>
@@ -117,20 +141,8 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="relative z-10 min-h-[calc(100vh-120px)] flex items-center justify-center px-4 sm:px-6">
-        <div
-          className="
-            w-full
-            max-w-[360px]
-            sm:max-w-[400px]
-            md:max-w-[440px]
-            bg-white/95
-            backdrop-blur
-            rounded-2xl
-            shadow-xl
-            border border-black/10
-          "
-        >
+      <div className="relative z-10 min-h-[calc(100vh-120px)] flex items-center justify-center px-4">
+        <div className="w-full max-w-[420px] bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-black/10">
           <div className="p-8">
             <div className="flex justify-center mb-8">
               <Image
@@ -139,7 +151,7 @@ export default function LoginPage() {
                 width={300}
                 height={180}
                 priority
-                className="w-[150px] sm:w-[170px] md:w-[190px] h-auto mx-auto drop-shadow-sm"
+                className="w-[180px] h-auto mx-auto drop-shadow-sm"
               />
             </div>
 
@@ -147,29 +159,22 @@ export default function LoginPage() {
               {/* Usuario */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Usuario</label>
-
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
                     placeholder="jguevara"
                     value={user}
                     onChange={(e) => setUser(e.target.value)}
-                    autoComplete="username"
                   />
-                  <div className="px-3 py-2 text-sm text-gray-600 border-l border-gray-300 bg-gray-100 whitespace-nowrap">
+                  <div className="px-3 py-2 text-sm text-gray-600 border-l bg-gray-100">
                     {DOMAIN}
                   </div>
-                </div>
-
-                <div className="text-xs text-gray-500 mt-1">
-                  Ingrese solo su usuario (ej: <b>jguevara</b>)
                 </div>
               </div>
 
               {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
@@ -177,11 +182,10 @@ export default function LoginPage() {
                     placeholder="********"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
                   />
                   <button
                     type="button"
-                    className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+                    className="px-3 py-2 text-sm text-gray-600"
                     onClick={() => setShowPassword((s) => !s)}
                   >
                     {showPassword ? 'Ocultar' : 'Ver'}
@@ -189,21 +193,19 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Olvidó contraseña */}
-              <div className="text-left">
-                <button
-                  type="button"
-                  onClick={onForgot}
-                  disabled={loading}
-                  className="text-sm text-green-700 hover:text-green-800 hover:underline disabled:opacity-60"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
+              {/* Olvidó */}
+              <button
+                type="button"
+                onClick={onForgot}
+                disabled={loading}
+                className="text-sm text-green-700 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
 
-              {/* Mensajes */}
+              {/* Mensaje */}
               {msg && (
-                <div className="text-sm rounded-lg px-3 py-2 border bg-yellow-50 border-yellow-200 text-yellow-900">
+                <div className="text-sm rounded-lg px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-900">
                   {msg}
                 </div>
               )}
@@ -212,17 +214,14 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg py-2.5 font-semibold text-white border border-green-700 bg-green-700 hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full rounded-lg py-2.5 font-semibold text-white bg-green-700 hover:bg-green-800"
               >
                 {loading ? 'Ingresando...' : 'INGRESAR'}
               </button>
 
-              {/* Aviso */}
-              <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-900">
-                Esta plataforma está en fase de construcción. Algunas funciones pueden no estar disponibles.
+              <div className="mt-3 text-center text-xs text-gray-500">
+                Versión: {version}
               </div>
-
-              <div className="mt-3 text-center text-xs text-gray-500">Versión: {version}</div>
             </form>
           </div>
         </div>
