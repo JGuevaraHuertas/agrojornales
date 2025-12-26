@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+// Evita que Vercel intente prerenderizar /login (y dispare el error de useSearchParams/Suspense en build)
+export const dynamic = 'force-dynamic'
+
 export default function LoginPage() {
   const router = useRouter()
 
@@ -134,8 +137,8 @@ export default function LoginPage() {
           alt="Agrokasa"
           width={210}
           height={64}
-          className="h-12 w-auto bg-transparent"
-          style={{ mixBlendMode: 'multiply' }}
+          className="h-12 w-auto"
+          style={{ objectFit: 'contain' }}
         />
       </div>
 
