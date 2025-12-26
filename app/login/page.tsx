@@ -1,28 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-/* =========================
-   WRAPPER CON SUSPENSE
-========================= */
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
-      <LoginContent />
-    </Suspense>
-  )
-}
-
-/* =========================
-   CONTENIDO REAL DEL LOGIN
-========================= */
-function LoginContent() {
   const router = useRouter()
-  const sp = useSearchParams()
-  const nextUrl = sp.get('next') || '/plan-mensual'
+
+  // Por defecto, después del login enviamos a Plan Mensual
+  // Usamos ref para evitar warnings de setState y no necesitamos re-render para esto.
+  const nextUrlRef = useRef('/plan-mensual')
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
@@ -42,6 +30,20 @@ function LoginContent() {
   }, [user])
 
   /* =========================
+     LEE ?next=... EN CLIENTE
+     (Evita useSearchParams => evita error en Vercel build)
+  ========================= */
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      const n = sp.get('next')
+      if (n && n.startsWith('/')) nextUrlRef.current = n
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  /* =========================
      SESIÓN ACTIVA
   ========================= */
   useEffect(() => {
@@ -50,20 +52,20 @@ function LoginContent() {
     const run = async () => {
       const { data } = await supabase.auth.getSession()
       if (!mounted) return
-      if (data.session) router.replace(nextUrl)
+      if (data.session) router.replace(nextUrlRef.current)
     }
 
     run()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (session) router.replace(nextUrl)
+      if (session) router.replace(nextUrlRef.current)
     })
 
     return () => {
       mounted = false
       sub.subscription.unsubscribe()
     }
-  }, [router, nextUrl])
+  }, [router])
 
   /* =========================
      LOGIN
@@ -89,7 +91,7 @@ function LoginContent() {
       return
     }
 
-    router.replace(nextUrl)
+    router.replace(nextUrlRef.current)
   }
 
   /* =========================
@@ -116,9 +118,6 @@ function LoginContent() {
     setMsg('Te enviamos un correo para restablecer tu contraseña.')
   }
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Fondo */}
@@ -165,10 +164,14 @@ function LoginContent() {
                     placeholder="jguevara"
                     value={user}
                     onChange={(e) => setUser(e.target.value)}
+                    autoComplete="username"
                   />
-                  <div className="px-3 py-2 text-sm text-gray-600 border-l bg-gray-100">
+                  <div className="px-3 py-2 text-sm text-gray-600 border-l bg-gray-100 whitespace-nowrap">
                     {DOMAIN}
                   </div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Ingrese solo su usuario (ej: <b>jguevara</b>)
                 </div>
               </div>
 
@@ -182,10 +185,11 @@ function LoginContent() {
                     placeholder="********"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
                   />
                   <button
                     type="button"
-                    className="px-3 py-2 text-sm text-gray-600"
+                    className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
                     onClick={() => setShowPassword((s) => !s)}
                   >
                     {showPassword ? 'Ocultar' : 'Ver'}
@@ -198,7 +202,7 @@ function LoginContent() {
                 type="button"
                 onClick={onForgot}
                 disabled={loading}
-                className="text-sm text-green-700 hover:underline"
+                className="text-sm text-green-700 hover:text-green-800 hover:underline disabled:opacity-60"
               >
                 ¿Olvidaste tu contraseña?
               </button>
@@ -214,14 +218,12 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg py-2.5 font-semibold text-white bg-green-700 hover:bg-green-800"
+                className="w-full rounded-lg py-2.5 font-semibold text-white border border-green-700 bg-green-700 hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? 'Ingresando...' : 'INGRESAR'}
               </button>
 
-              <div className="mt-3 text-center text-xs text-gray-500">
-                Versión: {version}
-              </div>
+              <div className="mt-3 text-center text-xs text-gray-500">Versión: {version}</div>
             </form>
           </div>
         </div>
