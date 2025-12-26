@@ -5,17 +5,15 @@ import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-/**
- * IMPORTANTE (Vercel / Next build):
- * - useSearchParams() debe estar dentro de un componente envuelto por <Suspense />.
- * - NO exportes `revalidate`/`dynamic` desde un archivo con 'use client' (da error en runtime).
- */
+// ✅ Importante para Vercel / build
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function LoginInner() {
   const router = useRouter()
   const sp = useSearchParams()
 
-  const nextUrl = useMemo(() => sp.get('next') || '/plan-mensual', [sp])
+  const nextUrl = sp.get('next') || '/plan-mensual'
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
@@ -65,10 +63,7 @@ function LoginInner() {
     }
 
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
 
     if (error) {
@@ -116,8 +111,8 @@ function LoginInner() {
           alt="Agrokasa"
           width={210}
           height={64}
-          className="h-12 w-auto bg-transparent"
-          style={{ mixBlendMode: 'multiply' }}
+          className="h-12 w-auto"
+          style={{ objectFit: 'contain' }}
         />
       </div>
 
@@ -139,7 +134,6 @@ function LoginInner() {
             <form onSubmit={onLogin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Usuario</label>
-
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
@@ -152,7 +146,6 @@ function LoginInner() {
                     {DOMAIN}
                   </div>
                 </div>
-
                 <div className="text-xs text-gray-500 mt-1">
                   Ingrese solo su usuario (ej: <b>jguevara</b>)
                 </div>
@@ -160,7 +153,6 @@ function LoginInner() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-
                 <div className="mt-1 flex items-center rounded-lg border border-gray-300 bg-gray-50 overflow-hidden">
                   <input
                     className="w-full bg-transparent px-3 py-2 outline-none"
@@ -202,7 +194,7 @@ function LoginInner() {
                 disabled={loading}
                 className="w-full rounded-lg py-2.5 font-semibold text-white border border-green-700 bg-green-700 hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? 'Ingresando...' : 'INGRESAR'}
+                {loading ? 'Ingresando…' : 'INGRESAR'}
               </button>
 
               <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-900">
@@ -223,6 +215,7 @@ function LoginInner() {
 }
 
 export default function LoginPage() {
+  // ✅ Esto elimina el error: useSearchParams dentro de Suspense
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-100" />}>
       <LoginInner />
