@@ -237,7 +237,8 @@ export default function PlanMensualPage() {
   const card = 'rounded-xl border border-gray-200 shadow-sm'
   const btn =
     'rounded-lg px-3 py-2 text-sm font-medium border border-green-700 bg-green-700 text-white hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed'
-  const btnGhost = 'rounded-lg px-3 py-2 text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+  const btnGhost =
+    'rounded-lg px-3 py-2 text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed'
   const selectCls =
     'border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-200'
   const inputCls =
@@ -281,7 +282,11 @@ export default function PlanMensualPage() {
         return
       }
 
-      const { data: perfil, error: perErr } = await supabase.from('profiles').select('rol').eq('email', email).maybeSingle()
+      const { data: perfil, error: perErr } = await supabase
+        .from('profiles')
+        .select('rol')
+        .eq('email', email)
+        .maybeSingle()
 
       if (perErr) {
         console.error(perErr)
@@ -328,7 +333,9 @@ export default function PlanMensualPage() {
         return
       }
 
-      const ids = (accesos ?? []).map((x) => (x as { depto_id: string | null }).depto_id).filter(Boolean) as string[]
+      const ids = (accesos ?? [])
+        .map((x) => (x as { depto_id: string | null }).depto_id)
+        .filter(Boolean) as string[]
 
       if (ids.length === 0) {
         setDeptos([])
@@ -634,7 +641,6 @@ export default function PlanMensualPage() {
   }, [sectores])
 
   const sectorHA = useMemo(() => {
-    // key: lote__red__sector -> ha
     const m = new Map<string, number>()
     for (const s of sectores) {
       const key = `${s.lote_id}__${s.red_id}__${s.sector_id}`
@@ -644,7 +650,10 @@ export default function PlanMensualPage() {
   }, [sectores])
 
   const totalHA = useMemo(() => Object.values(filas).flat().reduce((a, r) => a + toNumber(r.ha_prog), 0), [filas])
-  const totalJornales = useMemo(() => Object.values(filas).flat().reduce((a, r) => a + toNumber(r.jornales_prog), 0), [filas])
+  const totalJornales = useMemo(
+    () => Object.values(filas).flat().reduce((a, r) => a + toNumber(r.jornales_prog), 0),
+    [filas]
+  )
 
   function renumerar(fecha: string, arr: FilaUI[]) {
     return arr.map((x, idx) => ({ ...x, linea: idx + 1, fecha }))
@@ -996,14 +1005,23 @@ export default function PlanMensualPage() {
     window.print()
   }
 
+  // ✅ BOTÓN VERSIONES: lleva al page de versiones sin sobrecargar el plan mensual
+  const irAVersiones = () => {
+    if (!deptoSel?.id || !planId) return
+    const qs = new URLSearchParams({
+      anio: String(anio),
+      mes: String(mes),
+      depto_id: deptoSel.id,
+      plan_id: planId,
+    })
+    router.push(`/plan-versiones?${qs.toString()}`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-[1400px] p-4 space-y-4">
         {/* ✅ HEADER FIJO */}
-        <div
-          className={`${card} ${panelBg} p-4 sticky top-0 z-50 backdrop-blur`}
-          style={{ backgroundColor: 'rgba(255,255,255,0.98)' }}
-        >
+        <div className={`${card} ${panelBg} p-4 sticky top-0 z-50 backdrop-blur`} style={{ backgroundColor: 'rgba(255,255,255,0.98)' }}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-lg font-bold text-gray-800">PLANIFICACION MENSUAL DE JORNALES GAG</div>
@@ -1073,6 +1091,11 @@ export default function PlanMensualPage() {
 
             <button className={btn} onClick={guardar} disabled={!planId || guardando || loadingPlan}>
               {guardando ? 'Guardando...' : 'Guardar'}
+            </button>
+
+            {/* ✅ NUEVO BOTÓN: VERSIONES */}
+            <button className={btnGhost} onClick={irAVersiones} disabled={!deptoSel?.id || !planId}>
+              Versiones
             </button>
 
             <button className={btnGhost} onClick={() => router.push('/')}>
@@ -1190,7 +1213,6 @@ export default function PlanMensualPage() {
 
             <div className="mt-4 overflow-auto">
               <div className="min-w-[980px]">
-                {/* encabezado días */}
                 <div className="grid grid-cols-7 border border-gray-200 rounded-t-lg overflow-hidden bg-gray-50">
                   {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
                     <div key={d} className="px-3 py-2 text-sm font-semibold text-gray-700 border-r last:border-r-0 border-gray-200">
@@ -1199,7 +1221,6 @@ export default function PlanMensualPage() {
                   ))}
                 </div>
 
-                {/* semanas */}
                 <div className="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
                   {weeks.map((w, idx) => (
                     <div key={idx} className="grid grid-cols-7">
@@ -1212,13 +1233,10 @@ export default function PlanMensualPage() {
                         return (
                           <div
                             key={j}
-                            className={`min-h-[130px] border-t border-r last:border-r-0 border-gray-200 p-2 ${
-                              isToday ? 'bg-green-50' : 'bg-white'
-                            }`}
+                            className={`min-h-[130px] border-t border-r last:border-r-0 border-gray-200 p-2 ${isToday ? 'bg-green-50' : 'bg-white'}`}
                           >
                             {ymd ? (
                               <button className="w-full text-left h-full" onClick={() => scrollToFecha(ymd)} title="Ir a editar este día">
-                                {/* header del día */}
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex flex-col">
                                     <div className={`text-sm font-bold ${isToday ? 'text-green-800' : 'text-gray-800'}`}>{cell.day}</div>
@@ -1236,7 +1254,6 @@ export default function PlanMensualPage() {
                                   <div className="text-[11px] text-gray-500">{sum?.count ? `${sum.count} lab.` : ''}</div>
                                 </div>
 
-                                {/* lista compacta de labores */}
                                 <div className="mt-2 space-y-1">
                                   {(sum?.items ?? []).slice(0, 3).map((it, k) => (
                                     <div
@@ -1248,9 +1265,7 @@ export default function PlanMensualPage() {
                                     </div>
                                   ))}
 
-                                  {sum?.items && sum.items.length > 3 ? (
-                                    <div className="text-[11px] text-gray-500">+ {sum.items.length - 3} más…</div>
-                                  ) : null}
+                                  {sum?.items && sum.items.length > 3 ? <div className="text-[11px] text-gray-500">+ {sum.items.length - 3} más…</div> : null}
 
                                   {(!sum?.items || sum.items.length === 0) && ((tot?.ha ?? 0) > 0 || (tot?.jornales ?? 0) > 0) ? (
                                     <div className="text-[11px] text-gray-500 italic">Sin labor seleccionada</div>
