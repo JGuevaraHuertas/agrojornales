@@ -20,25 +20,29 @@ export default function LoginClient() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Normaliza usuario (sin espacios y en minúsculas)
   const email = useMemo(() => {
-    const u = user.trim()
+    const u = user.trim().toLowerCase()
     if (!u) return ''
     if (u.includes('@')) return `${u.split('@')[0]}${DOMAIN}`
     return `${u}${DOMAIN}`
   }, [user])
 
+  // Si ya hay sesión, redirige
   useEffect(() => {
     let mounted = true
 
     const run = async () => {
-      const { data } = await supabase.auth.getSession()
+      const { data, error } = await supabase.auth.getSession()
       if (!mounted) return
+      if (error) return
       if (data.session) router.replace(nextUrl)
     }
 
     run()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      // Evita redirects duplicados
       if (session) router.replace(nextUrl)
     })
 
@@ -52,7 +56,8 @@ export default function LoginClient() {
     e.preventDefault()
     setMsg('')
 
-    if (!user.trim() || !password) {
+    const u = user.trim()
+    if (!u || !password) {
       setMsg('Ingrese usuario y contraseña.')
       return
     }
@@ -71,7 +76,9 @@ export default function LoginClient() {
 
   const onForgot = async () => {
     setMsg('')
-    if (!user.trim()) {
+
+    const u = user.trim()
+    if (!u) {
       setMsg('Escribe tu usuario para enviarte el enlace de recuperación.')
       return
     }
@@ -137,6 +144,7 @@ export default function LoginClient() {
                     value={user}
                     onChange={(e) => setUser(e.target.value)}
                     autoComplete="username"
+                    inputMode="text"
                   />
                   <div className="px-3 py-2 text-sm text-gray-600 border-l border-gray-300 bg-gray-100 whitespace-nowrap">
                     {DOMAIN}
@@ -174,7 +182,7 @@ export default function LoginClient() {
                 <button
                   type="button"
                   onClick={onForgot}
-                  disabled={loading}
+                  disabled={loading || !user.trim()}
                   className="text-sm text-green-700 hover:text-green-800 hover:underline disabled:opacity-60"
                 >
                   ¿Olvidaste tu contraseña?

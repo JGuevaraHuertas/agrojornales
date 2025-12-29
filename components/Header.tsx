@@ -1,69 +1,93 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
 
-type Profile = {
+type UIProfile = {
   nombre: string | null
   email: string | null
   rol: string | null
 }
 
+type ProfileRow = {
+  nombre: string | null
+  email: string | null
+  rol: string | null
+}
+
+type AccesoRow = {
+  rol: string | null
+}
+
+function normalizeEmail(v: unknown): string {
+  return String(v ?? '').trim().toLowerCase()
+}
+
+function normalizeRol(v: unknown): string | null {
+  const s = String(v ?? '').trim()
+  return s ? s.toUpperCase() : null
+}
+
+function pickBestRol(roles: Array<string | null | undefined>): string | null {
+  const set = new Set(roles.map((r) => normalizeRol(r)).filter(Boolean) as string[])
+  if (set.has('ADMIN')) return 'ADMIN'
+  if (set.has('JEFE')) return 'JEFE'
+  if (set.has('USUARIO')) return 'USUARIO'
+  const first = Array.from(set)[0]
+  return first ?? null
+}
+
 export default function Header() {
   const pathname = usePathname()
-  const hideHeader = pathname === '/login' || pathname === '/logout'
+  const hideHeader = useMemo(() => pathname === '/login' || pathname === '/logout', [pathname])
 
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<UIProfile | null>(null)
   const [closing, setClosing] = useState(false)
 
   useEffect(() => {
     if (hideHeader) return
 
     const run = async () => {
-      const { data, error: userErr } = await supabase.auth.getUser()
-      if (userErr) {
-        console.error(userErr)
-      }
+      const { data: userRes, error: userErr } = await supabase.auth.getUser()
+      if (userErr) console.error(userErr)
 
-      const user = data?.user
+      const user = userRes?.user
       if (!user?.id) {
         setProfile(null)
         return
       }
 
-      const emailKey = String(user.email ?? '').trim().toLowerCase()
-
-      // 1) Perfil (nombre/email/rol opcional)
+      // 1) Perfil
       const { data: prof, error: profErr } = await supabase
         .from('profiles')
         .select('nombre, email, rol')
         .eq('id', user.id)
-        .maybeSingle()
+        .maybeSingle<ProfileRow>()
 
       if (profErr) console.error(profErr)
 
-      const nombre = (prof as any)?.nombre ?? null
-      const email = (prof as any)?.email ?? user.email ?? null
-      const rolProfile = (prof as any)?.rol ?? null
+      const nombre = prof?.nombre ?? null
+      const email = prof?.email ?? user.email ?? null
+      const emailKey = normalizeEmail(email)
 
-      // 2) Rol real (desde permisos)
+      // 2) Roles desde accesos (prioridad)
       const { data: accesos, error: accErr } = await supabase
-        .from('jefes_acceso_v2')
+        .from('jefes_acceso_v2') // si usas jefes_acceso, cambia aquí
         .select('rol')
         .eq('email', emailKey)
         .eq('activo', true)
-        .limit(1)
 
       if (accErr) console.error(accErr)
 
-      const rolAcceso = (accesos?.[0] as any)?.rol ?? null
+      const rolAccesos = pickBestRol((accesos ?? []).map((x: AccesoRow) => x.rol))
+      const rolProfile = normalizeRol(prof?.rol)
 
       setProfile({
         nombre,
         email,
-        rol: rolAcceso ?? rolProfile, // prioridad: jefes_acceso_v2
+        rol: rolAccesos ?? rolProfile,
       })
     }
 
@@ -86,13 +110,7 @@ export default function Header() {
     <header className="w-full bg-green-800 text-white px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div className="bg-white rounded-md p-1 flex items-center justify-center">
-          <Image
-            src="/logo-agrojornales.png"
-            alt="AgroJornales"
-            width={38}
-            height={38}
-            priority
-          />
+          <Image src="/logo-agrojornales.png" alt="AgroJornales" width={38} height={38} priority />
         </div>
 
         <div className="leading-tight">
