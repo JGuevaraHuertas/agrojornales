@@ -5,10 +5,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+type UserRole = 'USUARIO' | 'JEFE' | 'ADMIN'
+
 export default function LoginClient() {
   const router = useRouter()
   const sp = useSearchParams()
-  const nextUrl = sp.get('next') || '/plan-mensual'
+  const nextUrl = sp.get('next') || ''
 
   const DOMAIN = '@agrokasa.com.pe'
   const version = 'v1.0.0'
@@ -28,6 +30,30 @@ export default function LoginClient() {
     return `${u}${DOMAIN}`
   }, [user])
 
+  const getRole = async (emailKey: string): Promise<UserRole> => {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('email', emailKey)
+      .maybeSingle<{ rol: UserRole | null }>()
+
+    if (error) {
+      console.error(error)
+      return 'USUARIO'
+    }
+
+    return (data?.rol ?? 'USUARIO') as UserRole
+  }
+
+  const resolveDest = (role: UserRole): string => {
+    // USUARIO siempre entra a Avance Diario
+    if (role === 'USUARIO') return '/avance-diario'
+
+    // JEFE/ADMIN: si viene un next explícito, respetarlo; si no, ir a Plan
+    if (nextUrl && nextUrl.startsWith('/')) return nextUrl
+    return '/plan-mensual'
+  }
+
   // Si ya hay sesión, redirige
   useEffect(() => {
     let mounted = true
@@ -36,14 +62,24 @@ export default function LoginClient() {
       const { data, error } = await supabase.auth.getSession()
       if (!mounted) return
       if (error) return
-      if (data.session) router.replace(nextUrl)
+
+      const s = data.session
+      if (s?.user?.email) {
+        const role = await getRole(String(s.user.email).trim().toLowerCase())
+        router.replace(resolveDest(role))
+      }
     }
 
     run()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       // Evita redirects duplicados
-      if (session) router.replace(nextUrl)
+      if (session?.user?.email) {
+        void (async () => {
+          const role = await getRole(String(session.user.email).trim().toLowerCase())
+          router.replace(resolveDest(role))
+        })()
+      }
     })
 
     return () => {
@@ -71,7 +107,8 @@ export default function LoginClient() {
       return
     }
 
-    router.replace(nextUrl)
+    const role = await getRole(email)
+    router.replace(resolveDest(role))
   }
 
   const onForgot = async () => {

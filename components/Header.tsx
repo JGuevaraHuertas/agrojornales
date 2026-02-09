@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
+import { Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
 type UIProfile = {
@@ -31,17 +33,19 @@ function normalizeRol(v: unknown): string | null {
 }
 
 function pickBestRol(roles: Array<string | null | undefined>): string | null {
-  const set = new Set(roles.map((r) => normalizeRol(r)).filter(Boolean) as string[])
+  const set = new Set(roles.map(r => normalizeRol(r)).filter(Boolean) as string[])
   if (set.has('ADMIN')) return 'ADMIN'
   if (set.has('JEFE')) return 'JEFE'
   if (set.has('USUARIO')) return 'USUARIO'
-  const first = Array.from(set)[0]
-  return first ?? null
+  return Array.from(set)[0] ?? null
 }
 
 export default function Header() {
   const pathname = usePathname()
-  const hideHeader = useMemo(() => pathname === '/login' || pathname === '/logout', [pathname])
+  const hideHeader = useMemo(
+    () => pathname === '/login' || pathname === '/logout',
+    [pathname]
+  )
 
   const [profile, setProfile] = useState<UIProfile | null>(null)
   const [closing, setClosing] = useState(false)
@@ -50,9 +54,7 @@ export default function Header() {
     if (hideHeader) return
 
     const run = async () => {
-      const { data: userRes, error: userErr } = await supabase.auth.getUser()
-      if (userErr) console.error(userErr)
-
+      const { data: userRes } = await supabase.auth.getUser()
       const user = userRes?.user
       if (!user?.id) {
         setProfile(null)
@@ -60,26 +62,22 @@ export default function Header() {
       }
 
       // 1) Perfil
-      const { data: prof, error: profErr } = await supabase
+      const { data: prof } = await supabase
         .from('profiles')
         .select('nombre, email, rol')
         .eq('id', user.id)
         .maybeSingle<ProfileRow>()
-
-      if (profErr) console.error(profErr)
 
       const nombre = prof?.nombre ?? null
       const email = prof?.email ?? user.email ?? null
       const emailKey = normalizeEmail(email)
 
       // 2) Roles desde accesos (prioridad)
-      const { data: accesos, error: accErr } = await supabase
-        .from('jefes_acceso_v2') // si usas jefes_acceso, cambia aquí
+      const { data: accesos } = await supabase
+        .from('jefes_acceso_v2')
         .select('rol')
         .eq('email', emailKey)
         .eq('activo', true)
-
-      if (accErr) console.error(accErr)
 
       const rolAccesos = pickBestRol((accesos ?? []).map((x: AccesoRow) => x.rol))
       const rolProfile = normalizeRol(prof?.rol)
@@ -108,9 +106,16 @@ export default function Header() {
 
   return (
     <header className="w-full bg-green-800 text-white px-6 py-3 flex items-center justify-between">
+      {/* Logo */}
       <div className="flex items-center gap-3">
         <div className="bg-white rounded-md p-1 flex items-center justify-center">
-          <Image src="/logo-agrojornales.png" alt="AgroJornales" width={38} height={38} priority />
+          <Image
+            src="/logo-agrojornales.png"
+            alt="AgroJornales"
+            width={38}
+            height={38}
+            priority
+          />
         </div>
 
         <div className="leading-tight">
@@ -119,8 +124,9 @@ export default function Header() {
         </div>
       </div>
 
+      {/* Toolbar derecha */}
       <div className="flex items-center gap-4 text-sm">
-        {profile ? (
+        {profile && (
           <>
             <span>
               Usuario: <b>{profile.email ?? profile.nombre ?? '—'}</b>
@@ -129,8 +135,17 @@ export default function Header() {
               Rol: <b>{profile.rol ?? '-'}</b>
             </span>
           </>
-        ) : (
-          <span className="opacity-80">—</span>
+        )}
+
+        {/* ⚙️ Solo ADMIN */}
+        {profile?.rol === 'ADMIN' && (
+          <Link
+            href="/admin/usuarios"
+            title="Administrar usuarios"
+            className="border border-white/30 rounded p-2 hover:bg-white/10 transition"
+          >
+            <Settings size={18} />
+          </Link>
         )}
 
         <button
