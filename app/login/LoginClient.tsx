@@ -31,18 +31,32 @@ export default function LoginClient() {
   }, [user])
 
   const getRole = async (emailKey: string): Promise<UserRole> => {
+    const emailNorm = String(emailKey).trim().toLowerCase()
+
+    // En esta BD el rol vive en `usuarios_accesos`.
+    // Puede haber más de 1 fila por email (por depto). Tomamos la principal primero.
     const { data, error } = await supabase
-      .from('usuarios')
-      .select('rol')
-      .eq('email', emailKey)
-      .maybeSingle<{ rol: UserRole | null }>()
+      .from('usuarios_accesos')
+      .select('rol, jefe, principal, activo')
+      .eq('email', emailNorm)
+      .eq('activo', true)
+      .order('principal', { ascending: false })
+      .limit(1)
+      .maybeSingle<{ rol: string | null; jefe: boolean | null; principal: boolean | null; activo: boolean | null }>()
 
     if (error) {
-      console.error(error)
+      console.warn('[getRole] usuarios_accesos lookup failed', error)
       return 'USUARIO'
     }
 
-    return (data?.rol ?? 'USUARIO') as UserRole
+    // 1) Si viene rol explícito
+    const role = String(data?.rol ?? '').toUpperCase().trim()
+    if (role === 'ADMIN' || role === 'JEFE' || role === 'USUARIO') return role as UserRole
+
+    // 2) Fallback: si está marcado como jefe
+    if (data?.jefe) return 'JEFE'
+
+    return 'USUARIO'
   }
 
   const resolveDest = (role: UserRole): string => {

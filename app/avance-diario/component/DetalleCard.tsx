@@ -61,6 +61,8 @@ type AvanceRow = {
   papelUni: string
   variedad: string
   puntos: string
+
+  extras: Record<string, string>
 }
 
 type Props = {
@@ -150,14 +152,30 @@ export default function DetalleCard(props: Props) {
 
   const allMeta = useMemo<ExtraColMeta[]>(() => [...EXTRA_COLS, ...customColsMeta], [customColsMeta])
 
+  const visibleExtraCols = useMemo<ExtraColMeta[]>(() => {
+    return (extrasVisible ?? []).map((k) => {
+      const fixed = allMeta.find((x) => x.key === k)
+      if (fixed) return fixed
+
+      // Columna dinámica (custom_*)
+      const label = String(k).startsWith('custom_') ? String(k).replace(/^custom_/, '') : String(k)
+      return {
+        key: k,
+        label,
+        width: 'w-[110px]',
+        inputMode: 'numeric',
+      } as ExtraColMeta
+    })
+  }, [extrasVisible, allMeta])
+
   const extrasOptions = useMemo(() => {
     const visible = new Set<ExtraKey>(extrasVisible)
     return allMeta.filter((c) => !visible.has(c.key))
   }, [extrasVisible, allMeta])
 
   const BASE_COLS = 9 // #, Ubicación, Encargado, HA, Jornales, Cantidad, KG, Obs, Acción
-  const totalCols = BASE_COLS + extrasVisible.length
-  const tableMinWidthClass = getTableMinWidthClass(extrasVisible.length)
+  const totalCols = BASE_COLS + visibleExtraCols.length
+  const tableMinWidthClass = getTableMinWidthClass(visibleExtraCols.length)
 
   return (
     <div className={cardClassName + ' p-4'}>
@@ -178,8 +196,9 @@ export default function DetalleCard(props: Props) {
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+        {/* Subgrupo */}
+        <div className="md:col-span-4">
           <div className={labelClassName}>Subgrupo</div>
           <select
             className={inputClassName + ' w-full'}
@@ -196,7 +215,8 @@ export default function DetalleCard(props: Props) {
           </select>
         </div>
 
-        <div>
+        {/* Labor */}
+        <div className="md:col-span-4">
           <div className={labelClassName}>Labor</div>
           <select
             className={inputClassName + ' w-full'}
@@ -218,20 +238,26 @@ export default function DetalleCard(props: Props) {
             ))}
           </select>
         </div>
-      </div>
 
-      <ExtraColumnsPicker
-        inputCls={inputClassName}
-        btnGhost={btnGhostClassName}
-        extraToAdd={det.extraToAdd}
-        extrasOptions={extrasOptions.map((x) => ({ key: x.key, label: x.label }))}
-        onChange={onExtraToAddChange}
-        onAdd={onAddExtraCol}
-        // opcional: columna personalizada
-        customLabel={customLabel}
-        setCustomLabel={(v: string) => onCustomLabelChange?.(v)}
-        onAddCustom={(label: string) => onAddCustomCol?.(label)}
-      />
+        {/* Columnas extra + botones */}
+        <div className="md:col-span-4">
+          {/* ExtraColumnsPicker tiene mt-3 interno; lo compensamos para que quede a la misma altura */}
+          <div className="md:-mt-3">
+            <ExtraColumnsPicker
+              inputCls={inputClassName}
+              btnGhost={btnGhostClassName}
+              extraToAdd={det.extraToAdd}
+              extrasOptions={extrasOptions.map((x) => ({ key: x.key, label: x.label }))}
+              onChange={onExtraToAddChange}
+              onAdd={onAddExtraCol}
+              // opcional: columna personalizada
+              customLabel={customLabel}
+              setCustomLabel={(v: string) => onCustomLabelChange?.(v)}
+              onAddCustom={(label: string) => onAddCustomCol?.(label)}
+            />
+          </div>
+        </div>
+      </div>
 
       <ExtraColumnsChips
         extrasVisible={extrasVisible}
@@ -253,15 +279,11 @@ export default function DetalleCard(props: Props) {
               <th rowSpan={2} className="border px-2 py-2 w-[120px]">Cantidad</th>
               <th rowSpan={2} className="border px-2 py-2 w-[110px]">KG</th>
 
-              {extrasVisible.map((k) => {
-                const c = allMeta.find((x) => x.key === k)
-                if (!c) return null
-                return (
-                  <th key={String(k)} className={`border px-2 py-2 ${c.width}`}>
-                    {c.label}
-                  </th>
-                )
-              })}
+              {visibleExtraCols.map((c) => (
+                <th key={String(c.key)} className={`border px-2 py-2 ${c.width}`}>
+                  {c.label}
+                </th>
+              ))}
 
               <th rowSpan={2} className="border px-2 py-2 w-[70px] text-center">Obs</th>
               <th rowSpan={2} className="border px-2 py-2 w-[110px]">Acción</th>
@@ -402,23 +424,34 @@ export default function DetalleCard(props: Props) {
                       />
                     </td>
 
-                    {extrasVisible.map((k) => {
-                      const c = allMeta.find((x) => x.key === k)
-                      if (!c) return null
+                    {visibleExtraCols.map((c) => {
+                      const key = String(c.key)
+                      const isDynamic = key.startsWith('custom_')
 
-                      const raw = (row as Record<string, unknown>)[k]
-                      const val = typeof raw === 'string' ? raw : raw == null ? '' : String(raw)
+                      const val = isDynamic
+                        ? (row.extras?.[key] ?? '')
+                        : (() => {
+                            const raw = (row as Record<string, unknown>)[key]
+                            return typeof raw === 'string' ? raw : raw == null ? '' : String(raw)
+                          })()
 
                       return (
-                        <td key={String(k)} className="border px-2 py-2">
+                        <td key={key} className="border px-2 py-2">
                           <input
                             className={inputClassName + ' w-full'}
                             inputMode={c.inputMode}
                             value={val}
                             onChange={(e) => {
+                              const v = e.target.value
+                              if (isDynamic) {
+                                onUpdateRow(row._id, {
+                                  extras: { ...(row.extras ?? {}), [key]: v },
+                                })
+                                return
+                              }
+
                               const patch: Partial<AvanceRow> = {}
-                              // asignación dinámica sin `any`
-                              ;(patch as Partial<AvanceRow> & Record<string, string>)[String(k)] = e.target.value
+                              ;(patch as Partial<AvanceRow> & Record<string, string>)[key] = v
                               onUpdateRow(row._id, patch)
                             }}
                           />

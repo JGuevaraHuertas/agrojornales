@@ -101,6 +101,7 @@ type AvanceRow = {
   papelUni: string
   variedad: string
   puntos: string
+  extras: Record<string, string>
 }
 
 function toNum(v: unknown): number {
@@ -268,6 +269,7 @@ type DetalleUI = {
     papelUni: '',
     variedad: '',
     puntos: '',
+    extras: {},
   })
 
   const [rows, setRows] = useState<AvanceRow[]>(() => [makeRow(detalles[0].id)])
@@ -838,6 +840,8 @@ type DetalleUI = {
     papel_uni: number | null
     variedad: string | null
     puntos: number | null
+    extras: Record<string, unknown> | null
+    extras_meta: unknown[] | null
   }
 
   const hydrateFromDb = (data: AvanceDbRow[]) => {
@@ -878,6 +882,20 @@ type DetalleUI = {
         if (rr.grapas_uni != null) keysToShow.add('grapasUni')
         if (rr.papel_uni != null) keysToShow.add('papelUni')
         if (rr.puntos != null) keysToShow.add('puntos')
+        // Dynamic extras (custom_...)
+        const meta = Array.isArray(rr.extras_meta) ? rr.extras_meta : []
+        for (const k of meta) {
+          const kk = String(k ?? '').trim() as ExtraKey
+          if (kk) keysToShow.add(kk)
+        }
+
+        const ex = rr.extras && typeof rr.extras === 'object' ? rr.extras : null
+        if (ex) {
+          for (const k of Object.keys(ex)) {
+            const kk = String(k ?? '').trim() as ExtraKey
+            if (kk) keysToShow.add(kk)
+          }
+        }
       }
 
       newDetalles.push({
@@ -915,6 +933,17 @@ type DetalleUI = {
           papelUni: r.papel_uni == null ? '' : String(r.papel_uni),
           variedad: String(r.variedad ?? ''),
           puntos: r.puntos == null ? '' : String(r.puntos),
+          extras: (() => {
+            const ex = r.extras
+            if (!ex || typeof ex !== 'object') return {}
+            const out: Record<string, string> = {}
+            for (const [k, v] of Object.entries(ex as Record<string, unknown>)) {
+              const kk = String(k ?? '').trim()
+              if (!kk) continue
+              out[kk] = v == null ? '' : String(v)
+            }
+            return out
+          })(),
         })
       }
     }
@@ -929,7 +958,7 @@ type DetalleUI = {
 
     const { data, error } = await supabase
       .from('avance_labor_diario')
-      .select('id, fecha, depto_id, labor_id, email, encargado_codigo, hectareas, jornales, cantidad, unidad, observacion, lote_id, red_id, sector_id, yaramila_kg, temple_fert_kg, temple_kg, calmax_kg, adherente_lit, herbicida_lit, herbosato_lit, grapas_uni, papel_uni, variedad, puntos')
+      .select('id, fecha, depto_id, labor_id, email, encargado_codigo, hectareas, jornales, cantidad, unidad, observacion, lote_id, red_id, sector_id, yaramila_kg, temple_fert_kg, temple_kg, calmax_kg, adherente_lit, herbicida_lit, herbosato_lit, grapas_uni, papel_uni, variedad, puntos, extras, extras_meta')
       .eq('fecha', fecha)
       .eq('depto_id', deptoId)
       .eq('email', emailKey)
@@ -1006,6 +1035,7 @@ type DetalleUI = {
             || !!r.papelUni
             || !!r.variedad
             || !!r.puntos
+            || (r.extras && Object.values(r.extras).some((v) => String(v ?? '').trim()))
           return hasAny && !!labor
         })
 
@@ -1086,6 +1116,12 @@ type DetalleUI = {
           papel_uni: toNum(r.papelUni) > 0 ? toNum(r.papelUni) : null,
           variedad: (r.variedad || '').trim() ? (r.variedad || '').trim() : null,
           puntos: toNum(r.puntos) > 0 ? toNum(r.puntos) : null,
+          // Dynamic extras (custom columns)
+          extras: r.extras && typeof r.extras === 'object' ? r.extras : {},
+          extras_meta: (() => {
+            const det = detalles.find((d) => d.id === r.detalleId)
+            return det?.extrasVisible ?? []
+          })(),
         }
 
         const payload = { ...payloadBase, labor_id: String(labor.codigo) }
@@ -1171,14 +1207,14 @@ type DetalleUI = {
         </div>
 
         <div className={card + ' p-4'}>
-          {/* Arriba: Fecha + Departamento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
+          {/* Arriba: Fecha + Departamento + Nuevo detalle */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div className="md:col-span-4">
               <div className={label}>Fecha</div>
               <input className={inputCls + ' w-full'} type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
 
-            <div>
+            <div className="md:col-span-6">
               <div className={label}>Departamento</div>
               <select
                 className={inputCls + ' w-full'}
@@ -1194,13 +1230,12 @@ type DetalleUI = {
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Botón antes de los recuadros para agregar un nuevo DETALLE (otra labor) */}
-          <div className="mt-4 flex items-center justify-end">
-            <button className={btnGhost} type="button" onClick={addDetalle}>
-              + Nuevo detalle
-            </button>
+            <div className="md:col-span-2 flex md:justify-end">
+              <button className={btnGhost + ' w-full md:w-auto'} type="button" onClick={addDetalle}>
+                + Nuevo detalle
+              </button>
+            </div>
           </div>
 
           {/* Detalles (recuadros) */}
