@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -26,6 +26,14 @@ type AccesoRow = {
 }
 
 export default function AdminAccesosPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminAccesosInner />
+    </Suspense>
+  )
+}
+
+function AdminAccesosInner() {
   const searchParams = useSearchParams()
   const emailParam = (searchParams.get('email') || '').trim().toLowerCase()
 
