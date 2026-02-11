@@ -12,7 +12,7 @@ type Row = {
   jornales: number
   cantidad: number
   kg: number
-  extras?: Record<string, number>
+  extras?: Record<string, unknown>
   created_at?: string
   fecha?: string
   bloque_id?: string
@@ -43,13 +43,47 @@ function toStr(v: unknown): string {
   return String(v)
 }
 
-function toExtras(v: unknown): Record<string, number> {
+function toExtras(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== 'object') return {}
-  const out: Record<string, number> = {}
+  const out: Record<string, unknown> = {}
   for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
     const kk = String(k ?? '').trim()
     if (!kk) continue
-    out[kk] = toNum(val)
+    out[kk] = val
+  }
+  return out
+}
+
+// Columnas fijas de extras (cuando NO vienen dentro de extras/extras_meta)
+function fixedExtrasFromRow(r: Record<string, unknown>): Record<string, unknown> {
+  const pick = (a: unknown, b: unknown) => (a !== undefined && a !== null ? a : b)
+
+  const fixed: Record<string, unknown> = {
+    // KG
+    yaramilaKg: pick(r.yaramila_kg, r.yaramilaKg),
+    templeFertKg: pick(r.temple_fert_kg, r.templeFertKg),
+    templeKg: pick(r.temple_kg, r.templeKg),
+    calmaxKg: pick(r.calmax_kg, r.calmaxKg),
+
+    // Litros
+    adherenteLit: pick(r.adherente_lit, r.adherenteLit),
+    herbicidaLit: pick(r.herbicida_lit, r.herbicidaLit),
+    herbosatoLit: pick(r.herbosato_lit, r.herbosatoLit),
+
+    // Unidades
+    grapasUni: pick(r.grapas_uni, r.grapasUni),
+    papelUni: pick(r.papel_uni, r.papelUni),
+
+    // Otros
+    variedad: pick(r.variedad, r.variedad_texto),
+    puntos: pick(r.puntos, r.puntos_valor),
+  }
+
+  // Limpiamos keys vacíos / null (pero mantenemos 0 si viene explícito)
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(fixed)) {
+    if (v === undefined || v === null || String(k).trim() === '') continue
+    out[k] = v
   }
   return out
 }
@@ -84,7 +118,10 @@ function normalizeRow(r: Record<string, unknown>): Row {
     cantidad: toNum(r.cantidad ?? r.total_dia ?? r.total ?? 0),
     kg: toNum(r.kilos_kg ?? r.kg ?? r.kilos ?? r.kilos_total ?? 0),
 
-    extras: toExtras(r.extras ?? r.extras_meta ?? r.extras_json ?? r.extra ?? {}),
+    extras: {
+      ...fixedExtrasFromRow(r),
+      ...toExtras(r.extras ?? r.extras_meta ?? r.extras_json ?? r.extra ?? {}),
+    },
 
     bloque_id: toStr(r.bloque_id ?? r.bloqueId ?? r.reporte_bloque_id ?? r.reporteBloqueId ?? ''),
     created_at: toStr(r.created_at ?? r.createdAt ?? ''),
@@ -296,7 +333,7 @@ export default function ReporteAvancePage() {
           r.kg,
         ]
 
-        const extras = allExtraKeys.map((k) => (r.extras?.[k] ?? 0))
+        const extras = allExtraKeys.map((k) => (r.extras?.[k] ?? ''))
 
         const ratios = [ratio(r.jornales, r.ha), ratio(r.cantidad, r.ha), ratio(r.kg, r.ha)]
 
@@ -337,13 +374,7 @@ export default function ReporteAvancePage() {
         </div>
       </div>
 
-      <div className="mb-6 p-4 border rounded bg-gray-50">
-        <strong>Usuario:</strong> {user}
-      </div>
-
-      <div className="mb-4 text-sm text-gray-600">
-        Mostrando registros de: <strong>{fechaSel}</strong>
-      </div>
+      {/* Usuario header and "Mostrando registros de:" removed */}
 
       {loading ? (
         <div className="text-sm text-gray-600">Cargando…</div>
@@ -375,11 +406,6 @@ export default function ReporteAvancePage() {
             <div key={d.id} className="mb-8 border rounded p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <h2 className="font-semibold">{d.titulo}</h2>
-                {d.encargado ? (
-                  <div className="text-sm text-gray-700">
-                    <span className="font-medium">Encargado:</span> {d.encargado}
-                  </div>
-                ) : null}
               </div>
 
               <table className="w-full border text-sm">
@@ -415,7 +441,7 @@ export default function ReporteAvancePage() {
                       <td className="border p-2">{ratio(r.cantidad, r.ha)}</td>
                       <td className="border p-2">{ratio(r.kg, r.ha)}</td>
                       {allExtraKeys.map((k) => (
-                        <td key={k} className="border p-2">{r.extras?.[k] ?? 0}</td>
+                        <td key={k} className="border p-2">{String(r.extras?.[k] ?? '')}</td>
                       ))}
                     </tr>
                   ))}
@@ -428,34 +454,19 @@ export default function ReporteAvancePage() {
                     <td className="border p-2">{jorTotal}</td>
                     <td className="border p-2">{cantTotal}</td>
                     <td className="border p-2">{kgTotal}</td>
-                    <td className="border p-2">{ratio(jorTotal, haTotal)}</td>
-                    <td className="border p-2">{ratio(cantTotal, haTotal)}</td>
-                    <td className="border p-2">{ratio(kgTotal, haTotal)}</td>
+                    {/* Promedio SOLO para ratios */}
+                    <td className="border p-2">{avgJorHa}</td>
+                    <td className="border p-2">{avgCantHa}</td>
+                    <td className="border p-2">{avgKgHa}</td>
                     {allExtraKeys.map((k) => {
                       const exTotal = d.rows.reduce((acc, r) => acc + toNum(r.extras?.[k]), 0)
+                      // Si todos son no-numéricos, el total quedará 0 (ok).
                       return (
                         <td key={k} className="border p-2">
-                          {exTotal}
+                          {String(exTotal)}
                         </td>
                       )
                     })}
-                  </tr>
-                  <tr className="bg-gray-50">
-                    <td className="border p-2" colSpan={2}>
-                      Promedio
-                    </td>
-                    <td className="border p-2">—</td>
-                    <td className="border p-2">—</td>
-                    <td className="border p-2">—</td>
-                    <td className="border p-2">—</td>
-                    <td className="border p-2 font-medium">{avgJorHa}</td>
-                    <td className="border p-2 font-medium">{avgCantHa}</td>
-                    <td className="border p-2 font-medium">{avgKgHa}</td>
-                    {allExtraKeys.map((k) => (
-                      <td key={k} className="border p-2">
-                        
-                      </td>
-                    ))}
                   </tr>
                 </tbody>
               </table>
