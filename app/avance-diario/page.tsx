@@ -1194,6 +1194,16 @@ type DetalleUI = {
           <div className="flex gap-2">
             <button
               className={btnGhost}
+              type="button"
+              onClick={() => router.push('/reporte-avance')}
+              title="Ver reporte"
+            >
+              Ver reporte
+            </button>
+
+            <button
+              className={btnGhost}
+              type="button"
               onClick={() => {
                 if (userRole === 'USUARIO') return
                 router.push('/plan-mensual')

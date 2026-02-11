@@ -13,8 +13,8 @@ export default function HomePage() {
       const { data } = await supabase.auth.getSession()
       const hasSession = !!data?.session
 
-      setMsg(hasSession ? 'Redirigiendo al plan...' : 'Redirigiendo al login...')
-      router.replace(hasSession ? '/plan-mensual' : '/login')
+      setMsg(hasSession ? 'Redirigiendo a Avance Diario...' : 'Redirigiendo al login...')
+      router.replace(hasSession ? '/avance-diario' : '/login')
     }
 
     run()
